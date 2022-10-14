@@ -1,0 +1,224 @@
+1. Jenkins pod was installed using helm unable to access the service with Node Port
+- Tried doing it with load balancer service type
+The load balancer did not come up as there were
+Multiple tagged security groups found for instance i-045ebca28b894289a; ensure only the k8s security group is tagged; the tagged groups were sg-0f117a12166c0db5a(education-eks-VP6R0Zh7-node-20220908114318855700000006) sg-0fc893ab10f091abc(eks-cluster-sg-education-eks-VP6R0Zh7-1041057836)
+
+
+Install plugins on jenkins
+Kubernetes Plugin
+Docker Plugin
+Git Plugin
+Node and Label Parameter Plugin
+https://medium.com/swlh/quick-and-simple-how-to-setup-jenkins-distributed-master-slave-build-on-kubernetes-37f3d76aae7d
+
+https://www.jenkins.io/doc/book/installing/kubernetes/
+
+2.CREATE EFS
+
+Create an Amazon EFS file system
+In this section, you create a security group, Amazon EFS file system, two mount targets, and an EFS Access Point. The access point allows the Amazon EKS cluster to use the EFS file system.
+
+Capture your VPC ID
+First, you must find the VPC ID that was created in the previous step using the following command:
+
+aws ec2 describe-vpcs --region us-east-2
+Create a security group for your Amazon EFS mount target
+Next, create a security group for the Amazon EFS mount target, which requires your VPC ID.
+
+aws ec2 create-security-group \
+--region us-east-2 \
+--group-name efs-mount-sg \
+--description "Amazon EFS for EKS, SG for mount target" \
+--vpc-id vpc-0100181bdef996f4f
+
+{
+    "GroupId": "sg-0dc3f03fab42d1793"
+}
+
+
+identifier for our VPC (i.e. vpc-1234567ab12a345cd)
+Add rules to the security group to authorize inbound/outbound access
+Authorize inbound access to the security group for the Amazon EFS mount target (efs-mount-sg) to allow inbound traffic to the NFS port (2049) from the VPC CIDR block using the following command:
+
+aws ec2 authorize-security-group-ingress \
+--group-id sg-0dc3f03fab42d1793 \
+--region us-east-2 \
+--protocol tcp \
+--port 2049 \
+--cidr 10.0.0.0/16
+
+Create an Amazon EFS file system
+Next, create an encrypted Amazon EFS file system using the following command and record the file system ID:
+
+aws efs create-file-system \
+--creation-token creation-token \
+--performance-mode generalPurpose \
+--throughput-mode bursting \
+--region us-east-2 \
+--tags Key=Name,Value=MyEFSFileSystem \
+--encrypted
+
+{
+    "OwnerId": "644039448077",
+    "CreationToken": "creation-token",
+    "FileSystemId": "fs-04dd62e8bf776d9df",
+    "FileSystemArn": "arn:aws:elasticfilesystem:us-east-2:644039448077:file-system/fs-04dd62e8bf776d9df",
+    "CreationTime": "2022-09-10T11:26:24+04:00",
+    "LifeCycleState": "creating",
+    "Name": "MyEFSFileSystem",
+    "NumberOfMountTargets": 0,
+    "SizeInBytes": {
+        "Value": 0,
+        "ValueInIA": 0,
+        "ValueInStandard": 0
+    },
+    "PerformanceMode": "generalPurpose",
+    "Encrypted": true,
+    "KmsKeyId": "arn:aws:kms:us-east-2:644039448077:key/39e231d5-375d-469b-bba0-0d4ad65b604b",
+    "ThroughputMode": "bursting",
+    "Tags": [
+        {
+            "Key": "Name",
+            "Value": "MyEFSFileSystem"
+        }
+    ]
+}
+
+
+Capture your VPC subnet IDs
+To create mount targets, you must have subnet IDs for my node group. Use the following command to find and record the subnets IDs:
+
+aws ec2 describe-instances --filters Name=vpc-id,Values= vpc-0100181bdef996f4f --query 'Reservations[*].Instances[].SubnetId'
+
+Create two Amazon EFS mount targets
+Now that you have the security group, file system ID, and subnets, you can create mount targets in each of the Availability Zones using the following command:
+
+aws efs create-mount-target \
+--file-system-id fs-04dd62e8bf776d9df \
+--subnet-id subnet-0c1e46c1f8fa350b0 \
+--security-group sg-0dc3f03fab42d1793 \
+--region us-east-2
+
+aws efs create-mount-target \
+--file-system-id fs-04dd62e8bf776d9df \
+--subnet-id subnet-0a722e1fabc8f216b \
+--security-group sg-0dc3f03fab42d1793 \
+--region us-east-2
+
+aws efs create-mount-target \
+--file-system-id fs-04dd62e8bf776d9df \
+--subnet-id subnet-07575deb51266ede0 \
+--security-group sg-0dc3f03fab42d1793 \
+--region us-east-2
+
+{
+    "OwnerId": "644039448077",
+    "MountTargetId": "fsmt-0b9fffaef3f7db8c1",
+    "FileSystemId": "fs-04dd62e8bf776d9df",
+    "SubnetId": "subnet-0c1e46c1f8fa350b0",
+    "LifeCycleState": "creating",
+    "IpAddress": "10.0.2.18",
+    "NetworkInterfaceId": "eni-019d1d8fc48059038",
+    "AvailabilityZoneId": "use2-az2",
+    "AvailabilityZoneName": "us-east-2b",
+    "VpcId": "vpc-0100181bdef996f4f"
+}
+
+---
+{
+    "OwnerId": "644039448077",
+    "MountTargetId": "fsmt-0ae88afcb36233942",
+    "FileSystemId": "fs-04dd62e8bf776d9df",
+    "SubnetId": "subnet-0a722e1fabc8f216b",
+    "LifeCycleState": "creating",
+    "IpAddress": "10.0.3.221",
+    "NetworkInterfaceId": "eni-0138d89aa7a3b87fe",
+    "AvailabilityZoneId": "use2-az3",
+    "AvailabilityZoneName": "us-east-2c",
+    "VpcId": "vpc-0100181bdef996f4f"
+}
+
+----
+{
+    "OwnerId": "644039448077",
+    "MountTargetId": "fsmt-0bc2164d25da9db4e",
+    "FileSystemId": "fs-04dd62e8bf776d9df",
+    "SubnetId": "subnet-07575deb51266ede0",
+    "LifeCycleState": "creating",
+    "IpAddress": "10.0.1.204",
+    "NetworkInterfaceId": "eni-015e78b02d5e20098",
+    "AvailabilityZoneId": "use2-az1",
+    "AvailabilityZoneName": "us-east-2a",
+    "VpcId": "vpc-0100181bdef996f4f"
+}
+-----
+Be sure to create a mount target in each of the two Availability Zones!
+
+Create an Amazon EFS access point
+Now that you have your file system, let’s create an Amazon EFS Access Point. Amazon EFS access points are application-specific entry points into an EFS file system that make it easier to manage application access to shared datasets or, in our case, configuration. Regardless of how a container is built, access points can enforce a user identity, including the user’s POSIX groups, for all file system requests that are made through them. For our purposes, let’s create a Jenkins-specific EFS access point and choose to enforce user ID and a group ID of 1000 using the following command:
+
+aws efs create-access-point --file-system-id "fs-04dd62e8bf776d9df" \
+--posix-user Uid=1000,Gid=1000 \
+--root-directory "Path=/jenkins,CreationInfo={OwnerUid=1000,OwnerGid=1000,Permissions=0777}"
+
+fsap-0c125c55ec58bd760
+
+
+Record the access point ID (that is, fsap-0123456abc987634a) for future reference.
+
+Deploy the Amazon EFS CSI driver to your Amazon EKS cluster
+In this step, deploy the Amazon EFS CSI driver to the Amazon EKS cluster and create a persistent volume claim (PVC).
+
+Deploy the Amazon EFS CSI driver to your Amazon EKS cluster
+To deploy the Amazon EFS CSI driver, run the following command:
+
+ kubectl apply -k "github.com/kubernetes-sigs/aws-efs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
+serviceaccount/efs-csi-controller-sa created
+serviceaccount/efs-csi-node-sa created
+clusterrole.rbac.authorization.k8s.io/efs-csi-external-provisioner-role created
+clusterrolebinding.rbac.authorization.k8s.io/efs-csi-provisioner-binding created
+deployment.apps/efs-csi-controller created
+daemonset.apps/efs-csi-node created
+csidriver.storage.k8s.io/efs.csi.aws.com configured
+
+
+
+cd /Users/aditiwadekar/work/gitlab/terraform-eks-cluster-jenkins/jenkins
+ kubctl apply -f EFS-storageClass.yaml EFS-pv.yaml EFS-pvc.yaml
+
+ kubectl get sc,pv,pvc
+
+
+helm repo add stable https://charts.helm.sh/stable
+
+helm install jenkins stable/jenkins --set rbac.create=true,master.servicePort=80,master.serviceType=LoadBalancer,persistence.existingClaim=efs-claim
+
+printf $(kubectl get service jenkins -o jsonpath="{.status.loadBalancer.ingress[].hostname}");echo
+
+printf $(kubectl get secret jenkins -o jsonpath="{.data.jenkins-admin-password}" | base64 --decode);echo
+
+
+K0WWJxDcEY
+
+http://a4ce40c1cf7e341d78496ff25858561b-1660016614.us-east-2.elb.amazonaws.com:80/login
+
+---------
+
+https://aws.amazon.com/blogs/storage/deploying-jenkins-on-amazon-eks-with-amazon-efs/
+--------------
+
+Volumes not getting mounted
+https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html
+
+helm repo add aws-efs-csi-driver https://kubernetes-sigs.github.io/aws-efs-csi-driver/
+helm repo update
+
+helm upgrade -i aws-efs-csi-driver aws-efs-csi-driver/aws-efs-csi-driver \
+    --namespace kube-system \
+    --set image.repository=644039448077.dkr.ecr.region-code.amazonaws.com/eks/aws-efs-csi-driver \
+    --set controller.serviceAccount.create=false \
+    --set controller.serviceAccount.name=efs-csi-controller-sa
+
+To verify that aws-efs-csi-driver has started, run:
+
+    kubectl get pod -n kube-system -l "app.kubernetes.io/name=aws-efs-csi-driver,app.kubernetes.io/instance=aws-efs-csi-driver"

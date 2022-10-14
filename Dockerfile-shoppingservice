@@ -1,0 +1,34 @@
+FROM maven
+
+WORKDIR /app
+
+COPY api/package.json ./
+
+RUN npm install
+
+COPY api/ .
+
+CMD [ "npm", "start" ]
+EXPOSE 8080
+
+
+
+FROM node:6.5
+
+ENV PORT=8080
+ENV DB=postgresdb1
+ENV DBUSER=postgres
+ENV DBPASS=postgres
+ENV DBHOST=terraform-20220803091623880300000001.cuxihnrr7wlp.eu-west-1.rds.amazonaws.com
+ENV DBPORT=5432
+
+WORKDIR /app
+
+COPY api/package.json ./
+
+RUN npm install
+
+COPY api/ .
+
+CMD [ "npm", "start" ]
+EXPOSE 8080
