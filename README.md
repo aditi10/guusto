@@ -50,50 +50,18 @@ Prerequisites
 
 To setup Kubernetes cluster refer link: https://learn.hashicorp.com/tutorials/terraform/eks
 
-2. Install Jenkins master slave on Kubernetes cluster using helm and below steps:
-- Create a loadbaalncer which helps accessing the jenkins
-- Creates Jenkins master server using helm with the configurations
-- Creates a jenkins namespace
-`kubectl create namespace jenkins`
+# To access the Merchant application follow below steps:
 
-`kubectl get ns`
+1. Validate if the deployment is running:
+  kubectl -n app get deployments
+  
+2. Verify if the service is running:
+   kubectl -n app get svc
+   
+3. The merchant service is using an loadbalancer and shopping service is using ClusterIP for internal access:
+   merchant-service-lb   LoadBalancer   x.x.x.x   xxx.elb.amazonaws.com   80:30813/TCP   16h
+   shop-service          ClusterIP      x.x.x.x   <none>                  80/TCP         18h
 
-- Create Jenkins service account
-cd jenkins
-`kubectl create -f jenkins-sa.yaml`
-
-- create a persistent volume
-`kubectl create -f jenkins-volume.yaml`
-
-- Updated values in "helm-charts/charts/jenkins/values.yaml"
-
-
-`cd helm-charts/charts/jenkins/`
-
-`helm install jenkins -n jenkins -f values.yaml jenkinsci/jenkins`
-
-
-Refered link : https://www.bogotobogo.com/DevOps/Docker/Docker-Kubernetes-Jenkins-Helm.php and https://github.com/jenkinsci/helm-charts/tree/main/charts/jenkins
-
-# To access the Jenkins server follow below steps:
-
-1. Get your 'admin' user password by running:
-  kubectl exec --namespace jenkins -it svc/jenkins -c jenkins -- /bin/cat /run/secrets/additional/chart-admin-password && echo
-2. Get the Jenkins URL to visit by running these commands in the same shell:
-  export NODE_PORT=$(kubectl get --namespace jenkins -o jsonpath="{.spec.ports[0].nodePort}" services jenkins)
-  export NODE_IP=$(kubectl get nodes --namespace jenkins -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo http://$NODE_IP:$NODE_PORT/login
-
-Install Nodejs plugin in jenkins and setup pipeline in Jenkins using "Jenkinsfile"
-- Once the jenkins server is up, we need to install NodeJS plugin in it
-- Create a pipeline Job and add the Jenkinsfile
-- Install aws cli plugin on Jenkins, and user has permission to run it
-
-The Jenkinsfile
-1. Clones the git hub repository
-2. Executes the npm install command
-3. Downloads Hugo 0.91 version and execuutes it
-4. Runs the server using hugo command
-5. Deploys the application to AWS
+Access the service with loadbalancer URL http://<loadbalancerURL>/v1/merchants
 
 
